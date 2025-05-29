@@ -130,10 +130,9 @@ qa_ops_dashboard/ops_dashboard/
 
 *   **Component Structure (inspired by `src/components/reporting/`):**
     *   **Feature-Based Modularity:** Group components, API calls, utils, and styles by feature (e.g., `reporting/`, `gtg/`, `userManagement/`).
-    *   **`views/`**: These are smart/container components. They fetch data (via functions from the feature\'s `api/` directory like `reportingAPI.js`), manage state for that feature view, and compose smaller, dumber UI components.
     *   **`styles/`**: Use CSS Modules (`*.module.css`) for component-level styling to prevent class name collisions and ensure encapsulation. For global styles, use `index.css` at the root of the `src/` folder.
     *   **`utils/`**: Place utility functions specific to a feature (e.g., `reportingUtils.js`) within its directory. Global utilities go into `src/utils/`.
-    *   **`api/`**: Isolate all API call logic for a feature here (e.g., `reportingAPI.js`). These functions should use the central `apiClient.js` from `src/services/`.
+    *   **`api/`**: Isolate all API call logic for a feature like this here (e.g., `gtgApis.js`).
     *   **Single Use Case Components:** Strive to create components with a single, clear responsibility. This enhances reusability, testability, and maintainability.
 *   **Constants (`src/constants/appConstants.js`):**
     *   Use for UI-specific text, theme settings, local storage keys, etc.
@@ -142,15 +141,14 @@ qa_ops_dashboard/ops_dashboard/
         ```javascript
         // qa_ops_dashboard/ops_dashboard/src/services/apiClient.js
         import axios from 'axios';
-        import { FRONTEND_APP_CONSTANTS } from '../constants/appConstants'; // Assuming frontend constants are here
+        import { CONSTANTS } from '../constants'; // Assuming frontend constants are here
 
         const apiClient = axios.create({
-          baseURL: FRONTEND_APP_CONSTANTS.API_ENDPOINT, // Example: http://localhost:5001/api
+          baseURL: CONSTANTS.API_ENDPOINT, 
           withCredentials: true,
         });
 
         // Add interceptors for auth, error handling etc. if needed
-        // apiClient.interceptors.request.use(config => { ... });
 
         export default apiClient;
 
@@ -159,7 +157,6 @@ qa_ops_dashboard/ops_dashboard/
 
         export const fetchAllGtgSquads = async () => {
           try {
-            // Assuming qa_ops has an endpoint like /api/v1/constants/all-gtg-squads
             // that returns: { "squadsString": "accessibility,app_automate,app_live,..." }
             const response = await apiClient.get('/constants/all-gtg-squads');
             // The backend might return it as a string, so split if necessary
@@ -171,104 +168,22 @@ qa_ops_dashboard/ops_dashboard/
           }
         };
 
-        // In a component (e.g., src/components/gtg/views/GtgForm.jsx or PRDetailsForm.jsx):
-        // import { fetchAllGtgSquads } from '../api/gtgAPI';
-        // import { useEffect, useState } from 'react';
-        //
-        // const [squadOptions, setSquadOptions] = useState([]);
-        // const [loadingSquads, setLoadingSquads] = useState(true);
-        //
-        // useEffect(() => {
-        //   const loadSquads = async () => {
-        //     setLoadingSquads(true);
-        //     const squads = await fetchAllGtgSquads();
-        //     setSquadOptions(squads.map(squad => ({ id: squad, label: squad }))); // Adapt to { id, label } for select/checkbox
-        //     setLoadingSquads(false);
-        //   };
-        //   loadSquads();
-        // }, []);
-        //
-        // // Then use squadOptions to render checkboxes or a multi-select dropdown.
-        // // if (loadingSquads) return <p>Loading squads...</p>;
-        // // return (
-        // //   <Form.Group controlId="gtg_required_squads">
-        // //     <Form.Label>Select squads for GTG *</Form.Label>
-        // //     {squadOptions.map((option) => (
-        // //       <Form.Check
-        // //         key={option.id}
-        // //         type="checkbox"
-        // //         label={option.label}
-        // //         // checked={gtgRequiredSquads?.includes(option.label)}
-        // //         // onChange={handleSquadChange}
-        // //         value={option.id}
-        // //       />
-        // //     ))}
-        // //   </Form.Group>
-        // // );
         ```
 *   **State Management:**
-    *   For simple local component state, use `useState` and `useReducer`.
+    *   For simple local component state, use `useState`.
 *   **API Calls:**
     *   Centralize API interaction logic. Use a configured Axios instance from `src/services/apiClient.js` for base URL, `withCredentials`, default headers, and interceptors (e.g., for adding auth tokens, global error handling).
         ```javascript
         // Example: src/services/apiClient.js
         import axios from 'axios';
-        import { FRONTEND_APP_CONSTANTS } from '../constants/appConstants'; // Assuming API_ENDPOINT is in appConstants.js
+        import { CONSTANTS } from '../constants/appConstants'; // Assuming API_ENDPOINT is in appConstants.js
 
         const apiClient = axios.create({
-          baseURL: FRONTEND_APP_CONSTANTS.API_ENDPOINT, // Or your actual API base URL from your constants
+          baseURL: CONSTANTS.API_ENDPOINT, // Or your actual API base URL from your constants
           withCredentials: true,
           // You can add other default configurations here, like timeout
           // timeout: 10000, // 10 seconds
         });
-
-        // Optional: Request interceptor (e.g., to add auth token or custom headers)
-        apiClient.interceptors.request.use(
-          (config) => {
-            // const token = /* get token from storage or context */;
-            // if (token) {
-            //   config.headers.Authorization = `Bearer ${token}`;
-            // }
-            // Example: Add a custom header
-            // config.headers['X-Custom-Header'] = 'someValue';
-            return config;
-          },
-          (error) => {
-            // Handle request error
-            console.error('API Request Error:', error);
-            return Promise.reject(error);
-          }
-        );
-
-        // Optional: Response interceptor (e.g., for global error handling or data transformation)
-        apiClient.interceptors.response.use(
-          (response) => {
-            // You can transform response data here if needed
-            return response; // Or return response.data directly if preferred
-          },
-          (error) => {
-            // Handle global errors, e.g., 401 unauthorized, 500 server error
-            console.error('API Response Error:', error.response || error.message);
-            if (error.response) {
-              // const { status, data } = error.response;
-              // switch (status) {
-              //   case 401:
-              //     // Redirect to login or refresh token
-              //     break;
-              //   case 403:
-              //     // Show permission denied message
-              //     break;
-              //   case 500:
-              //     // Show server error message
-              //     break;
-              //   default:
-              //     // Handle other errors
-              // }
-            }
-            // Potentially redirect to login or show a global notification
-            return Promise.reject(error);
-          }
-        );
 
         export default apiClient;
         ```
@@ -312,4 +227,4 @@ If `qa_ops_dashboard` has a reporting feature for Mothership products displaying
     *   **Parameterized API Calls:** Modify API calls in `src/components/reporting/api/reportingAPI.js` to include the `productLine`.
     *   **Conditional Rendering:** In `src/components/reporting/views/ReportView.jsx`, use the fetched data and `productLine` prop to conditionally render metric Z or W.
 
-By following these detailed guidelines and leveraging GitHub Copilot effectively with targeted prompts, we can build robust, scalable, and maintainable solutions within the `qa-components` ecosystem. Always critically review and test Copilot's suggestions before committing them.
+
