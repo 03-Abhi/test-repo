@@ -11,6 +11,8 @@ This document provides best practices and guidelines for developing within the `
 
 ## Project Structure and Development Guidelines
 
+**Note:** The filenames and specific component names mentioned in the examples below are for illustrative purposes. Actual filenames and structures may vary within the project. Always refer to the current codebase for the most accurate information.
+
 ### 1. `qa_ops` (Backend - Node.js API)
 
 The `qa_ops` service is a Node.js application using the Express framework. It serves as the backend API, handling business logic, data processing, interactions with databases and communication with other internal or external services.
@@ -192,12 +194,12 @@ qa_ops_dashboard/ops_dashboard/
     *   Prefer CSS Modules (`*.module.css`) for component-scoped styles.
     *   Use `index.css` in the `src/` directory for base styling, resets, and any global CSS rules or variables.
 *   **GTG Dashboard Extension (for Speedboat teams):**
-    *   **Identify Reusability:** Before creating new GTG components for Speedboat, thoroughly examine existing Mothership GTG components in `src/components/gtg/`.
-    *   **Adapt and Parameterize:** Adapt existing components (e.g., in `src/components/gtg/views/GtgStatusView.jsx`) to handle data from both Mothership and Speedboat. This might involve:
+    *   **Identify Reusability:** Before creating new GTG components for Speedboat, thoroughly examine existing Mothership GTG components in `src/components/new_gtg_dashboard/`.
+    *   **Adapt and Parameterize:** Adapt existing components (e.g., in `src/components/new_gtg_dashboard/NewGtgDashboard.jsx`) to handle data from both Mothership and Speedboat. This might involve:
         *   Passing a `productLine` prop to components.
         *   Making API calls in `src/components/gtg/api/gtgAPI.js` conditional or parameterized based on `productLine`.
         *   Using conditional rendering within components to display Speedboat-specific information or UI elements.
-    *   **New Components:** Only create new components if Speedboat requirements are fundamentally different. Place them within the `src/components/gtg/` structure.
+    *   **New Components:** Only create new components if Speedboat requirements are fundamentally different. Place them within the `src/components/new_gtg_dashboard/` structure.
     *   **Universal Data Models:** Ensure backend data structures for GTG are consistent for both product lines to simplify frontend logic.
 
 ## Mothership vs. Speedboat
@@ -214,7 +216,7 @@ qa_ops_dashboard/ops_dashboard/
     *   Pass parameters (e.g., `productLine`) to functions or components.
     *   Use conditional logic based on these parameters.
 
-**Example Scenario (Revisited):**
+**Example Scenario ():**
 
 If `qa_ops_dashboard` has a reporting feature for Mothership products displaying metrics X, Y, and Z, and you need to add reporting for Speedboat products displaying metrics X, Y, and W:
 
