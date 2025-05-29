@@ -60,8 +60,6 @@ qa_ops/
           // ... other slack related constants
         };
         // ...
-        // Note: Constants are often exported directly using `exports.KEY = VALUE;`
-        // and might not be aggregated in a single module.exports object.
 
         // Example of internal usage (e.g., in qa_ops/controllers/actions.js):
         const constants = require('../config/constants'); // Or: const { BASE_BRANCH, GITHUB_OWNER } = require('../config/constants');
@@ -110,81 +108,174 @@ qa_ops_dashboard/ops_dashboard/
     ├── main.jsx                  # The entry point for the React application. This file renders the root `App` component into the DOM.
     ├── assets/                   # Stores static assets such as images (PNG, SVG, JPG), fonts (WOFF, TTF), icons, or other media files that are imported and used by various components across the application.
     ├── components/               # Houses all React components, organized by feature or commonality.
-    │   ├── common/               # General-purpose, highly reusable UI components used across multiple features (e.g., `Button.jsx`, `Modal.jsx`, `Spinner.jsx`, `Table.jsx`, `Input.jsx`).
+    │   ├── commonComponents      # General-purpose, highly reusable UI components used across multiple features (e.g., `Header.jsx`, `Home.jsx`, `Docs.jsx`, `Merge.jsx`).
     │   ├── reporting/            # Components specifically for the "Reporting" feature.
-    │   │   ├── api/              # Functions for API calls related to reporting (e.g., `reportingAPI.js`), using `apiClient`.
+    │   │   ├── api/              # Functions for API calls related to reporting (e.g., `apis.js`).
     │   │   ├── styles/           # CSS Modules (e.g., `ReportView.module.css`) for reporting components.
-    │   │   ├── utils/            # Utility functions for the reporting feature (e.g., `reportDataFormatter.js`).
-    │   │   ├── views/            # Container components for reporting views (e.g., `ReportView.jsx`).
+    │   │   ├── utils/            # Utility functions for the reporting feature (e.g., `utils.js`).
+    │   │   ├── views/            # Container components for reporting views (e.g., `ReportingHome.jsx`).
     │   │   └── ReportSpecificComponent.jsx # Smaller, presentational components for reporting.
-    │   ├── gtg/                  # Components for the GTG (Good To Go) dashboard.
+    │   ├── new_gtg_dashboard/    # Components for the GTG (Good To Go) dashboard.
     │   │   ├── api/              # API calls for GTG feature (e.g., `gtgAPI.js`).
-    │   │   ├── styles/           # Styles for GTG components (e.g., `GtgStatusView.module.css`).
+    │   │   ├── styles/           # Styles for GTG components (e.g., `GtgStatusViewcss`).
     │   │   ├── utils/            # Utility functions for GTG feature.
     │   │   ├── views/            # View components for GTG feature (e.g., `GtgStatusView.jsx`).
     │   │   └── GtgSpecificComponent.jsx # Smaller components for GTG.
     │   └── (other_features)/     # Additional feature-specific directories (e.g., `userManagement/`, `userProfile/`, `settings/`) follow a similar structure, each containing their own `api/`, `styles/`, `utils/`, `views/`, and specific component files as needed.
-    ├── constants/                # Holds frontend-specific constants.
-    │   └── appConstants.js       # Defines UI text, theme configurations (colors, fonts), animation timings, local storage keys, route paths, and other static values used throughout the frontend. **Avoid duplicating backend constants here; fetch them via API.**
-    ├── contexts/                 # Contains React Context API providers and consumers for managing global or shared application state (e.g., `AuthContext.jsx` for authentication, `ThemeContext.jsx` for UI themes, `NotificationContext.jsx` for global notifications). Each context typically has its own file.
-    ├── hooks/                    # Stores custom React hooks that encapsulate reusable stateful logic or side effects (e.g., `useForm.js` for form handling, `useFetch.js` for data fetching, `useLocalStorage.js` for browser storage interaction, `useDebounce.js` for debouncing).
-    ├── layouts/                  # Defines layout components that provide the overall structure for different types of pages (e.g., `MainLayout.jsx` including Header, Sidebar, and Footer for authenticated areas; `AuthLayout.jsx` for login/signup pages).
-    ├── pages/                    # Contains top-level page components that are directly mapped to application routes. These components often compose layout components and feature-specific `views/` components from the `components/` directory (e.g., `HomePage.jsx`, `ReportingPage.jsx`, `GtgDashboardPage.jsx`, `UserProfilePage.jsx`). Each major route will typically have a corresponding page component.
-    ├── services/                 # Manages API service layers and other external service integrations.
-    │   └── apiClient.js          # Centralized API client setup (e.g., an Axios instance) configured with the base URL, default headers, and interceptors for request/response handling (e.g., adding authentication tokens, global error handling like redirecting on 401s, logging).
-    │   └── (other_services)/     # Could include other service-related files, like WebSocket handlers or specific external API integrations.
-    ├── styles/                   # Contains global styles, theme definitions (e.g., CSS variables for colors, typography), CSS resets, or utility CSS classes that apply across the entire application (e.g., `global.css`, `theme.css`, `utilities.css`).
-    ├── utils/                    # Provides global utility functions that are not specific to any single feature or component and can be reused throughout the application (e.g., `dateFormatter.js` for date manipulation, `validationUtils.js` for common validation logic, `localStorageHelper.js` for local storage interactions).
-    └── router/                   # Configures the application's routing.
-        └── index.js              # Defines all application routes using React Router, including public routes, protected/private routes (e.g., checking `AuthContext`), nested routes, and potentially lazy loading of page components for performance optimization.
+    ├── constants.js              # Holds frontend-specific constants.
+    └── Router.jsx                # Defines all application routes using `react-router-dom`. It handles basic authentication by checking for a token (via `useToken` hook) and rendering a `Login` component if no token is present. It then defines various application paths and maps them to their respective components within a `<Switch>` statement. Also includes a default route.
 ```
 
 **Best Practices for `qa_ops_dashboard`:**
 
 *   **Component Structure (inspired by `src/components/reporting/`):**
     *   **Feature-Based Modularity:** Group components, API calls, utils, and styles by feature (e.g., `reporting/`, `gtg/`, `userManagement/`).
-    *   **`views/`**: These are smart/container components. They fetch data (via functions from the feature's `api/` directory like `reportingAPI.js`), manage state for that feature view, and compose smaller, dumber UI components.
-    *   **`styles/`**: Use CSS Modules (`*.module.css`) for component-level styling to prevent class name collisions and ensure encapsulation. For global styles, use `src/styles/global.css`.
+    *   **`views/`**: These are smart/container components. They fetch data (via functions from the feature\'s `api/` directory like `reportingAPI.js`), manage state for that feature view, and compose smaller, dumber UI components.
+    *   **`styles/`**: Use CSS Modules (`*.module.css`) for component-level styling to prevent class name collisions and ensure encapsulation. For global styles, use `index.css` at the root of the `src/` folder.
     *   **`utils/`**: Place utility functions specific to a feature (e.g., `reportingUtils.js`) within its directory. Global utilities go into `src/utils/`.
     *   **`api/`**: Isolate all API call logic for a feature here (e.g., `reportingAPI.js`). These functions should use the central `apiClient.js` from `src/services/`.
     *   **Single Use Case Components:** Strive to create components with a single, clear responsibility. This enhances reusability, testability, and maintainability.
 *   **Constants (`src/constants/appConstants.js`):**
     *   Use for UI-specific text, theme settings, local storage keys, etc.
-    *   **Crucially:** For any data that needs to be consistent with the backend (e.g., product types, status codes, role definitions), **fetch it from `qa_ops` API endpoints.** Do not hardcode or duplicate backend constants.
+    *   **Crucially:** For any data that needs to be consistent with the backend (e.g., product types, status codes, role definitions, `ALL_GTG_SQUADS`), **fetch it from `qa_ops` API endpoints.** Do not hardcode or duplicate backend constants.
     *   **Example (consuming backend constants):**
         ```javascript
-        // qa_ops_dashboard/ops_dashboard/src/components/reporting/api/reportingAPI.js
+        // qa_ops_dashboard/ops_dashboard/src/services/apiClient.js
+        import axios from 'axios';
+        import { FRONTEND_APP_CONSTANTS } from '../constants/appConstants'; // Assuming frontend constants are here
+
+        const apiClient = axios.create({
+          baseURL: FRONTEND_APP_CONSTANTS.API_ENDPOINT, // Example: http://localhost:5001/api
+          withCredentials: true,
+        });
+
+        // Add interceptors for auth, error handling etc. if needed
+        // apiClient.interceptors.request.use(config => { ... });
+
+        export default apiClient;
+
+        // qa_ops_dashboard/ops_dashboard/src/components/gtg/api/gtgAPI.js
         import apiClient from '../../../services/apiClient';
 
-        export const fetchProductLines = async () => {
+        export const fetchAllGtgSquads = async () => {
           try {
-            // Assuming qa_ops has an endpoint like /api/constants/product-lines
-            const response = await apiClient.get('/constants/product-lines');
-            return response.data; // e.g., { MOTHERSHIP: 'mothership', SPEEDBOAT: 'speedboat' }
+            // Assuming qa_ops has an endpoint like /api/v1/constants/all-gtg-squads
+            // that returns: { "squadsString": "accessibility,app_automate,app_live,..." }
+            const response = await apiClient.get('/constants/all-gtg-squads');
+            // The backend might return it as a string, so split if necessary
+            return response.data.squadsString.split(','); // e.g., ['accessibility', 'app_automate', ...]
           } catch (error) {
-            console.error("Error fetching product lines:", error);
-            // Handle error appropriately, maybe show a notification via NotificationContext
-            return {};
+            console.error("Error fetching all GTG squads:", error);
+            // Handle error appropriately
+            return [];
           }
         };
 
-        // In a component (e.g., src/components/reporting/views/ReportFilters.jsx):
-        // import { fetchProductLines } from '../api/reportingAPI';
-        // const [productLines, setProductLines] = useState({});
+        // In a component (e.g., src/components/gtg/views/GtgForm.jsx or PRDetailsForm.jsx):
+        // import { fetchAllGtgSquads } from '../api/gtgAPI';
+        // import { useEffect, useState } from 'react';
+        //
+        // const [squadOptions, setSquadOptions] = useState([]);
+        // const [loadingSquads, setLoadingSquads] = useState(true);
+        //
         // useEffect(() => {
-        //   fetchProductLines().then(data => setProductLines(data));
+        //   const loadSquads = async () => {
+        //     setLoadingSquads(true);
+        //     const squads = await fetchAllGtgSquads();
+        //     setSquadOptions(squads.map(squad => ({ id: squad, label: squad }))); // Adapt to { id, label } for select/checkbox
+        //     setLoadingSquads(false);
+        //   };
+        //   loadSquads();
         // }, []);
+        //
+        // // Then use squadOptions to render checkboxes or a multi-select dropdown.
+        // // if (loadingSquads) return <p>Loading squads...</p>;
+        // // return (
+        // //   <Form.Group controlId="gtg_required_squads">
+        // //     <Form.Label>Select squads for GTG *</Form.Label>
+        // //     {squadOptions.map((option) => (
+        // //       <Form.Check
+        // //         key={option.id}
+        // //         type="checkbox"
+        // //         label={option.label}
+        // //         // checked={gtgRequiredSquads?.includes(option.label)}
+        // //         // onChange={handleSquadChange}
+        // //         value={option.id}
+        // //       />
+        // //     ))}
+        // //   </Form.Group>
+        // // );
         ```
 *   **State Management:**
     *   For simple local component state, use `useState` and `useReducer`.
-    *   For cross-component state or global state, use React Context (`src/contexts/`) (e.g., `AuthContext`, `ThemeContext`) for moderately complex scenarios.
-    *   For more complex global state management, consider libraries like Zustand or Redux Toolkit if the need arises.
 *   **API Calls:**
-    *   Centralize API interaction logic. Use the `apiClient.js` in `src/services/` for base Axios configuration, including interceptors for adding auth tokens to requests and handling global errors (e.g., logging, showing notifications, or redirecting on 401/403 errors).
-    *   Feature-specific API functions should reside in the feature's `api/` directory.
+    *   Centralize API interaction logic. Use a configured Axios instance from `src/services/apiClient.js` for base URL, `withCredentials`, default headers, and interceptors (e.g., for adding auth tokens, global error handling).
+        ```javascript
+        // Example: src/services/apiClient.js
+        import axios from 'axios';
+        import { FRONTEND_APP_CONSTANTS } from '../constants/appConstants'; // Assuming API_ENDPOINT is in appConstants.js
+
+        const apiClient = axios.create({
+          baseURL: FRONTEND_APP_CONSTANTS.API_ENDPOINT, // Or your actual API base URL from your constants
+          withCredentials: true,
+          // You can add other default configurations here, like timeout
+          // timeout: 10000, // 10 seconds
+        });
+
+        // Optional: Request interceptor (e.g., to add auth token or custom headers)
+        apiClient.interceptors.request.use(
+          (config) => {
+            // const token = /* get token from storage or context */;
+            // if (token) {
+            //   config.headers.Authorization = `Bearer ${token}`;
+            // }
+            // Example: Add a custom header
+            // config.headers['X-Custom-Header'] = 'someValue';
+            return config;
+          },
+          (error) => {
+            // Handle request error
+            console.error('API Request Error:', error);
+            return Promise.reject(error);
+          }
+        );
+
+        // Optional: Response interceptor (e.g., for global error handling or data transformation)
+        apiClient.interceptors.response.use(
+          (response) => {
+            // You can transform response data here if needed
+            return response; // Or return response.data directly if preferred
+          },
+          (error) => {
+            // Handle global errors, e.g., 401 unauthorized, 500 server error
+            console.error('API Response Error:', error.response || error.message);
+            if (error.response) {
+              // const { status, data } = error.response;
+              // switch (status) {
+              //   case 401:
+              //     // Redirect to login or refresh token
+              //     break;
+              //   case 403:
+              //     // Show permission denied message
+              //     break;
+              //   case 500:
+              //     // Show server error message
+              //     break;
+              //   default:
+              //     // Handle other errors
+              // }
+            }
+            // Potentially redirect to login or show a global notification
+            return Promise.reject(error);
+          }
+        );
+
+        export default apiClient;
+        ```
+    *   Feature-specific API functions should reside in the feature\'s `api/` directory and use this `apiClient`.
 *   **Styling:**
-    *   Prefer CSS Modules for component-scoped styles.
-    *   Use global styles in `src/styles/global.css` for base styling, resets, and CSS theme variables.
+    *   Prefer CSS Modules (`*.module.css`) for component-scoped styles.
+    *   Use `index.css` in the `src/` directory for base styling, resets, and any global CSS rules or variables.
 *   **GTG Dashboard Extension (for Speedboat teams):**
     *   **Identify Reusability:** Before creating new GTG components for Speedboat, thoroughly examine existing Mothership GTG components in `src/components/gtg/`.
     *   **Adapt and Parameterize:** Adapt existing components (e.g., in `src/components/gtg/views/GtgStatusView.jsx`) to handle data from both Mothership and Speedboat. This might involve:
