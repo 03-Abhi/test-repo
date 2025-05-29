@@ -13,7 +13,7 @@ This document provides best practices and guidelines for developing within the `
 
 ### 1. `qa_ops` (Backend - Node.js API)
 
-The `qa_ops` service is a Node.js application using the Express framework. It serves as the backend API, handling business logic, data processing, interactions with databases (e.g., PostgreSQL with Sequelize), and communication with other internal or external services.
+The `qa_ops` service is a Node.js application using the Express framework. It serves as the backend API, handling business logic, data processing, interactions with databases and communication with other internal or external services.
 
 **Key Directory Structure:**
 
@@ -24,20 +24,19 @@ qa_ops/
 ├── branch_recreation_scheduler/ # Contains scripts and logic related to automated branch recreation processes, likely scheduled tasks.
 ├── config/                   # Configuration files for various aspects of the application.
 │   ├── constants.js          # CRITICAL: Defines application-level constants, frequently used static data, mappings (e.g., status codes, type definitions), and non-sensitive configurations. This is the single source of truth for such data.
-│   ├── database.js           # (Example, actual name might vary) Sequelize or other database connection configurations (connection strings, pooling options) for different environments (development, staging, production). Often uses environment variables for credentials.
-│   └── environment.js        # (Example) Manages environment-specific variables and settings, often using a library like `dotenv` to load `.env` files.
-├── controllers/              # Request handlers (Express route handlers). Each controller typically groups related actions for a specific resource (e.g., `userController.js`, `reportController.js`). Controllers are responsible for:
+│   ├── database.js           # Database connection configurations.
+├── controllers/              # Request handlers (Express route handlers). Controllers orchestrate application logic by processing incoming requests and coordinating actions. They typically group related functionalities (e.g., `userController.js` for user management, `reportController.js` for reporting, `actions.js` for various automated operations). Responsibilities include:
 │                             #   - Receiving and validating request data (often using Joi schemas from `params/`).
-│                             #   - Calling appropriate helper functions or service modules from `helpers/` for business logic.
-│                             #   - Formatting and sending HTTP responses.
+│                             #   - Invoking service modules or helper functions from `helpers/` to execute business logic.
+│                             #   - Constructing and sending appropriate HTTP responses.
 ├── ecosystem.config.js       # PM2 process manager configuration file. Defines how the application should be run, monitored, and managed in production (e.g., clustering, environment variables, logging).
 ├── helpers/                  # Utility functions and helper modules that encapsulate reusable business logic, data transformations, or interactions with external services. (e.g., `dateFormatter.js`, `authHelper.js`, `dbQueryHelper.js`). These are crucial for keeping controllers lean.
-├── index.js                  # Entry point of the application. Typically imports `app.js` and starts the HTTP server (e.g., `app.listen()`).
+├── index.js                  # Entry point of the application. 
 ├── jenkins_metrics/          # Modules and scripts specifically for collecting, processing, or exposing Jenkins-related metrics.
 ├── migrations/               # Database migration scripts (e.g., using Sequelize CLI). Each file defines changes to the database schema (creating tables, adding columns, etc.) and allows for version control of the database structure.
-├── models/                   # Database schemas and models, typically defined using an ORM like Sequelize. Each file (e.g., `User.js`, `Report.js`) represents a table and defines its columns, data types, associations (hasOne, hasMany, etc.), and any associated instance/static methods for custom queries or data manipulation.
+├── models/                   # Defines database schemas, particularly for MongoDB using Mongoose, or contains configurations for direct SQL/MySQL interactions. Each file might represent a collection/table schema (e.g., `User.js` for a 'users' collection) defining fields, types, and potentially Mongoose schema methods.
 ├── package.json              # Node.js project manifest: lists dependencies, development dependencies, scripts (e.g., for starting, testing, linting), and project metadata.
-├── params/                   # Contains validation schemas, often using Joi. These schemas (e.g., `userValidationSchemas.js`) define the expected structure, data types, and constraints for incoming request parameters (body, query, path params) and are used in controllers or as middleware for validation.
+├── params/                   # Potentially for request parameter configurations or other specific parameters. (Note: Current usage might differ from typical validation schema storage, e.g., may hold connection strings or specific operational flags).
 ├── public/                   # Static assets that can be served directly by Express (e.g., images, documentation files). Less common for pure APIs.
 ├── routes/                   # API route definitions. Routes are typically grouped by resource or feature into separate files (e.g., `userRoutes.js`, `reportRoutes.js`). Each file defines URL patterns and maps them to controller actions.
 ├── routes.js                 # Main router aggregation file. Imports all individual route files from the `routes/` directory and mounts them onto the main Express application router.
@@ -48,41 +47,50 @@ qa_ops/
 **Best Practices for `qa_ops`:**
 
 *   **Constants (`config/constants.js`):**
-    *   This is the **single source of truth**. Any data, mapping, or configuration that might be used in multiple places or is critical for consistency (e.g., product types, status enums, role definitions) MUST be defined here.
+    *   This is the **single source of truth**. Any data, mapping, or configuration that might be used in multiple places or is critical for consistency (e.g., product types, status enums, role definitions, default branch names, external service URLs) MUST be defined here.
     *   If the frontend (`qa_ops_dashboard`) needs access to these constants, create specific, lean API endpoints in `qa_ops` (e.g., in a `constantsController.js`) to expose only the necessary constants. **Do NOT duplicate backend constants directly in the frontend codebase.**
     *   **Example:**
         ```javascript
-        // qa_ops/config/constants.js
-        const PRODUCT_LINES = Object.freeze({
-          MOTHERSHIP: 'mothership',
-          SPEEDBOAT: 'speedboat'
-        });
-
-        const USER_ROLES = Object.freeze({
-          ADMIN: 'admin',
-          USER: 'user',
-          GUEST: 'guest'
-        });
-
-        module.exports = { PRODUCT_LINES, USER_ROLES };
-
-        // qa_ops/controllers/constantsController.js
-        const { PRODUCT_LINES, USER_ROLES } = require('../config/constants');
-
-        exports.getProductLines = (req, res) => {
-          res.json(PRODUCT_LINES);
+        // qa_ops/config/constants.js Example:
+        // ...
+        exports.BASE_BRANCH = 'pre_prod'; // Default base branch for pre-production
+        exports.GITHUB_OWNER = 'browserstack';
+        exports.SLACK = {
+          channel: "team-qa-deploys",
+          // ... other slack related constants
         };
+        // ...
+        // Note: Constants are often exported directly using `exports.KEY = VALUE;`
+        // and might not be aggregated in a single module.exports object.
 
-        exports.getUserRoles = (req, res) => {
-          res.json(USER_ROLES); // Expose only what's needed
+        // Example of internal usage (e.g., in qa_ops/controllers/actions.js):
+        const constants = require('../config/constants'); // Or: const { BASE_BRANCH, GITHUB_OWNER } = require('../config/constants');
+        const { send_slack_text_message } = require('../helpers/slack'); // Helper that might use SLACK constants
+
+        async function recreatePreProd(repo) {
+          const defaultBranch = constants.BASE_BRANCH;
+          const owner = constants.GITHUB_OWNER;
+          logger.info(`Recreating pre-prod for repo: ${owner}/${repo}, from branch: ${defaultBranch}`);
+          // ... logic using defaultBranch and owner ...
+
+          // Example of using another constant indirectly or directly
+          await send_slack_text_message(constants.SLACK.channel, `Recreation of ${repo} ${defaultBranch} started.`);
+        }
+        // ...
+
+        // For exposing constants to the frontend (e.g., in a qa_ops/controllers/constantsController.js):
+        // (Retain this pattern for frontend needs)
+        const { RELEVANT_CONSTANT_FOR_FRONTEND } = require('../config/constants');
+
+        exports.getRelevantConstant = (req, res) => {
+          res.json(RELEVANT_CONSTANT_FOR_FRONTEND);
         };
         ```
 *   **Controllers:** Keep controllers lean and focused on request/response handling. Delegate complex business logic to `helpers/` or dedicated service modules. Ensure proper error handling and consistent response formats.
 *   **Routes:** Group routes logically in the `routes/` directory (e.g., `userRoutes.js`, `productRoutes.js`). Use descriptive naming. Version your APIs (e.g., `/api/v1/resource`, `/api/v2/resource`) if introducing breaking changes.
-*   **Models:** Define clear, well-documented Sequelize models. Utilize associations effectively. Add instance or static methods for common data operations related to that model.
+*   **Models/Data Access:** When using Mongoose with MongoDB, define clear, well-documented schemas in the `models/` directory. For direct SQL/MySQL interactions (e.g., for GTG), ensure database interaction logic (often found in `helpers/` like `mysql.js` or `dbQueryHelper.js`) is well-organized, secure (e.g., using parameterized queries to prevent SQL injection), and efficient. Connection configurations are typically in `config/database.js` or `config/constants.js`.
 *   **Error Handling:** Implement robust, centralized error handling middleware in `app.js` or a dedicated error handling module. This middleware should catch errors, log them, and send user-friendly JSON error responses with correct HTTP status codes.
 *   **API Design:** Adhere to RESTful principles. Use standard HTTP verbs correctly. Design clear, consistent, and predictable URL structures.
-*   **Validation:** Use Joi schemas in `params/` for all incoming request data. Validate early in the controller or via dedicated validation middleware.
 
 ### 2. `qa_ops_dashboard` (Frontend - React)
 
@@ -96,36 +104,39 @@ qa_ops_dashboard/ops_dashboard/
 ├── index.html                # Main HTML file, entry point for the Vite/React application.
 ├── package.json              # Lists frontend dependencies (React, Vite, Axios, etc.), dev dependencies, and scripts (start, build, test, lint).
 ├── vite.config.js            # Vite build configuration: defines plugins, server options, build output, aliases, etc.
-├── public/                   # Static assets (images, fonts, manifest.json) that are copied directly to the build output.
-└── src/
-    ├── App.jsx                   # Main application component: sets up React Router, global context providers (e.g., `AuthContext`, `ThemeContext`), and overall layout structure.
-    ├── main.jsx                  # Entry point for the React application: renders the root `App` component into the DOM.
-    ├── assets/                   # Static assets like images (png, svg), fonts, or other media files imported by components.
-    ├── components/               # Reusable UI components, organized by feature or commonality.
-    │   ├── common/               # General-purpose, highly reusable components used across multiple features (e.g., `Button.jsx`, `Modal.jsx`, `Spinner.jsx`, `Table.jsx`, `Input.jsx`).
-    │   ├── reporting/            # Components specifically for the "Reporting" feature. This structure is a good model for other features.
-    │   │   ├── styles/           # CSS Modules (e.g., `ReportView.module.css`) or styled-components for `reporting` components, ensuring scoped styles.
-    │   │   ├── utils/            # Utility functions specific to the reporting feature (e.g., `reportDataFormatter.js`, `chartHelper.js` in `reportingUtils.js`).
-    │   │   ├── views/            # Larger, container-like components (smart components) that represent a specific view or page within the reporting feature (e.g., `ReportView.jsx`). They compose smaller components and manage feature-specific state and data fetching via `api/`.
-    │   │   ├── api/              # Functions dedicated to making API calls related to the reporting feature (e.g., `reportingAPI.js`). These functions typically use the centralized `apiClient`.
-    │   │   └── ReportSpecificComponent.jsx # A smaller, presentational component with a single, specific use case within the reporting feature.
-    │   └── gtg/                  # Components for the GTG (Good To Go) dashboard. Follow a similar sub-structure as `reporting/` (api/, styles/, utils/, views/).
-    │       ├── styles/
-    │       ├── utils/
-    │       ├── views/
-    │       └── api/
-    ├── constants/                # Frontend-specific constants.
-    │   └── appConstants.js       # UI text, theme configurations (colors, fonts), animation timings, local storage keys, etc. **Avoid duplicating backend constants here; fetch them via API.**
-    ├── contexts/                 # React Context API providers and consumers for managing global or shared state (e.g., `AuthContext.jsx`, `ThemeContext.jsx`, `NotificationContext.jsx`).
-    ├── hooks/                    # Custom React hooks that encapsulate reusable stateful logic (e.g., `useForm.js`, `useFetch.js`, `useLocalStorage.js`, `useDebounce.js`).
-    ├── layouts/                  # Layout components that define the overall structure of pages (e.g., `MainLayout.jsx` with Header, Sidebar, Footer; `AuthLayout.jsx` for login/signup pages).
-    ├── pages/                    # Top-level page components that are directly mapped to routes. These components often compose layout components and feature-specific `views/` components. (e.g., `HomePage.jsx`, `ReportingPage.jsx`, `GtgDashboardPage.jsx`).
-    ├── services/                 # API service layers.
-    │   └── apiClient.js          # Centralized API client setup (e.g., an Axios instance) with base URL, default headers, and interceptors for request/response handling (e.g., adding auth tokens, global error handling like redirecting on 401s).
-    ├── styles/                   # Global styles, theme definitions (e.g., CSS variables), CSS resets, or utility CSS classes (e.g., `global.css`).
-    ├── utils/                    # Global utility functions that are not specific to any single feature or component (e.g., `dateFormatter.js`, `validationUtils.js`, `localStorageHelper.js`).
-    └── router/                   # React Router configuration.
-        └── index.js              # Defines application routes using React Router, including protected routes (e.g., checking `AuthContext`), nested routes, and lazy loading of page components.
+├── public/                   # Static assets (images, fonts, manifest.json) that are copied directly to the build output folder.
+└── src/                      # Contains all the source code for the React application.
+    ├── App.jsx                   # Main application component: responsible for setting up React Router, global context providers (e.g., `AuthContext`, `ThemeContext`), and the overall layout structure of the application.
+    ├── main.jsx                  # The entry point for the React application. This file renders the root `App` component into the DOM.
+    ├── assets/                   # Stores static assets such as images (PNG, SVG, JPG), fonts (WOFF, TTF), icons, or other media files that are imported and used by various components across the application.
+    ├── components/               # Houses all React components, organized by feature or commonality.
+    │   ├── common/               # General-purpose, highly reusable UI components used across multiple features (e.g., `Button.jsx`, `Modal.jsx`, `Spinner.jsx`, `Table.jsx`, `Input.jsx`).
+    │   ├── reporting/            # Components specifically for the "Reporting" feature.
+    │   │   ├── api/              # Functions for API calls related to reporting (e.g., `reportingAPI.js`), using `apiClient`.
+    │   │   ├── styles/           # CSS Modules (e.g., `ReportView.module.css`) for reporting components.
+    │   │   ├── utils/            # Utility functions for the reporting feature (e.g., `reportDataFormatter.js`).
+    │   │   ├── views/            # Container components for reporting views (e.g., `ReportView.jsx`).
+    │   │   └── ReportSpecificComponent.jsx # Smaller, presentational components for reporting.
+    │   ├── gtg/                  # Components for the GTG (Good To Go) dashboard.
+    │   │   ├── api/              # API calls for GTG feature (e.g., `gtgAPI.js`).
+    │   │   ├── styles/           # Styles for GTG components (e.g., `GtgStatusView.module.css`).
+    │   │   ├── utils/            # Utility functions for GTG feature.
+    │   │   ├── views/            # View components for GTG feature (e.g., `GtgStatusView.jsx`).
+    │   │   └── GtgSpecificComponent.jsx # Smaller components for GTG.
+    │   └── (other_features)/     # Additional feature-specific directories (e.g., `userManagement/`, `userProfile/`, `settings/`) follow a similar structure, each containing their own `api/`, `styles/`, `utils/`, `views/`, and specific component files as needed.
+    ├── constants/                # Holds frontend-specific constants.
+    │   └── appConstants.js       # Defines UI text, theme configurations (colors, fonts), animation timings, local storage keys, route paths, and other static values used throughout the frontend. **Avoid duplicating backend constants here; fetch them via API.**
+    ├── contexts/                 # Contains React Context API providers and consumers for managing global or shared application state (e.g., `AuthContext.jsx` for authentication, `ThemeContext.jsx` for UI themes, `NotificationContext.jsx` for global notifications). Each context typically has its own file.
+    ├── hooks/                    # Stores custom React hooks that encapsulate reusable stateful logic or side effects (e.g., `useForm.js` for form handling, `useFetch.js` for data fetching, `useLocalStorage.js` for browser storage interaction, `useDebounce.js` for debouncing).
+    ├── layouts/                  # Defines layout components that provide the overall structure for different types of pages (e.g., `MainLayout.jsx` including Header, Sidebar, and Footer for authenticated areas; `AuthLayout.jsx` for login/signup pages).
+    ├── pages/                    # Contains top-level page components that are directly mapped to application routes. These components often compose layout components and feature-specific `views/` components from the `components/` directory (e.g., `HomePage.jsx`, `ReportingPage.jsx`, `GtgDashboardPage.jsx`, `UserProfilePage.jsx`). Each major route will typically have a corresponding page component.
+    ├── services/                 # Manages API service layers and other external service integrations.
+    │   └── apiClient.js          # Centralized API client setup (e.g., an Axios instance) configured with the base URL, default headers, and interceptors for request/response handling (e.g., adding authentication tokens, global error handling like redirecting on 401s, logging).
+    │   └── (other_services)/     # Could include other service-related files, like WebSocket handlers or specific external API integrations.
+    ├── styles/                   # Contains global styles, theme definitions (e.g., CSS variables for colors, typography), CSS resets, or utility CSS classes that apply across the entire application (e.g., `global.css`, `theme.css`, `utilities.css`).
+    ├── utils/                    # Provides global utility functions that are not specific to any single feature or component and can be reused throughout the application (e.g., `dateFormatter.js` for date manipulation, `validationUtils.js` for common validation logic, `localStorageHelper.js` for local storage interactions).
+    └── router/                   # Configures the application's routing.
+        └── index.js              # Defines all application routes using React Router, including public routes, protected/private routes (e.g., checking `AuthContext`), nested routes, and potentially lazy loading of page components for performance optimization.
 ```
 
 **Best Practices for `qa_ops_dashboard`:**
